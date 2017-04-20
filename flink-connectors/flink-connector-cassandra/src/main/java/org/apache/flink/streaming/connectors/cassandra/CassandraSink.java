@@ -22,6 +22,7 @@ import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.java.tuple.Tuple;
+import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.api.java.typeutils.TupleTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSink;
@@ -30,6 +31,7 @@ import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.transformations.SinkTransformation;
 import org.apache.flink.streaming.api.transformations.StreamTransformation;
 import org.apache.flink.streaming.runtime.operators.CheckpointCommitter;
+import org.apache.flink.types.Row;
 
 /**
  * This class wraps different Cassandra sink implementations to provide a common interface for all of them.
@@ -190,10 +192,13 @@ public class CassandraSink<IN> {
 	 * @param <IN>  input type
 	 * @return CassandraSinkBuilder, to further configure the sink
 	 */
-	public static <IN, T extends Tuple> CassandraSinkBuilder<IN> addSink(DataStream<IN> input) {
+	public static <IN, T extends Tuple, R extends Row> CassandraSinkBuilder<IN> addSink(DataStream<IN> input) {
 		if (input.getType() instanceof TupleTypeInfo) {
 			DataStream<T> tupleInput = (DataStream<T>) input;
 			return (CassandraSinkBuilder<IN>) new CassandraTupleSinkBuilder<>(tupleInput, tupleInput.getType(), tupleInput.getType().createSerializer(tupleInput.getExecutionEnvironment().getConfig()));
+		} else if (input.getType() instanceof RowTypeInfo) {
+			DataStream<R> rowInput = (DataStream<R>) input;
+			return (CassandraSinkBuilder<IN>) new CassandraRowSinkBuilder<>(rowInput, rowInput.getType(), rowInput.getType().createSerializer(rowInput.getExecutionEnvironment().getConfig()));
 		} else {
 			return new CassandraPojoSinkBuilder<>(input, input.getType(), input.getType().createSerializer(input.getExecutionEnvironment().getConfig()));
 		}
@@ -331,6 +336,30 @@ public class CassandraSink<IN> {
 					: new CassandraSink<>(input.transform("Cassandra Sink", null, new CassandraTupleWriteAheadSink<>(query, serializer, builder, committer)));
 			} else {
 				return new CassandraSink<>(input.addSink(new CassandraTupleSink<IN>(query, builder)).name("Cassandra Sink"));
+			}
+		}
+	}
+
+	public static class CassandraRowSinkBuilder<IN extends Row> extends CassandraSinkBuilder<IN> {
+		public CassandraRowSinkBuilder(DataStream<IN> input, TypeInformation<IN> typeInfo, TypeSerializer<IN> serializer) {
+			super(input, typeInfo, serializer);
+		}
+
+		@Override
+		protected void sanityCheck() {
+			super.sanityCheck();
+			if (query == null || query.length() == 0) {
+				throw new IllegalArgumentException("Query must not be null or empty.");
+			}
+		}
+
+		@Override
+		public CassandraSink<IN> build() throws Exception {
+			sanityCheck();
+			if (isWriteAheadLogEnabled) {
+				throw new UnsupportedOperationException();
+			} else {
+				return new CassandraSink<>(input.addSink(new CassandraRowSink<IN>(query, builder)).name("Cassandra Sink"));
 			}
 		}
 	}
