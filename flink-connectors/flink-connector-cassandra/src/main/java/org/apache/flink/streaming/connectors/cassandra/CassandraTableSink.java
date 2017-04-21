@@ -35,14 +35,14 @@ import java.util.Properties;
  * A cassandra  {@link StreamTableSink}.
  *
  */
-class CassandraTableink implements StreamTableSink<Row> {
+class CassandraTableSink implements StreamTableSink<Row> {
 	private final List<InetSocketAddress> hostAddrs;
 	private final String cql;
 	private final String[] fieldNames;
 	private final TypeInformation[] fieldTypes;
 	private final Properties properties;
 
-	public CassandraTableink(List<InetSocketAddress> hostAddrs, String cql, String[] fieldNames, TypeInformation[] fieldTypes, Properties properties) {
+	public CassandraTableSink(List<InetSocketAddress> hostAddrs, String cql, String[] fieldNames, TypeInformation[] fieldTypes, Properties properties) {
 		this.hostAddrs = Preconditions.checkNotNull(hostAddrs, "hostAddrs");
 		this.cql = Preconditions.checkNotNull(cql, "cql");
 		this.fieldNames = Preconditions.checkNotNull(fieldNames, "fieldNames");
@@ -67,7 +67,11 @@ class CassandraTableink implements StreamTableSink<Row> {
 
 	@Override
 	public TableSink<Row> configure(String[] fieldNames, TypeInformation<?>[] fieldTypes) {
-		return new CassandraTableink(this.hostAddrs, this.cql, this.fieldNames, this.fieldTypes, this.properties);
+		fieldNames = Preconditions.checkNotNull(fieldNames, "fieldNames");
+		fieldTypes = Preconditions.checkNotNull(fieldTypes, "fieldTypes");
+		Preconditions.checkArgument(fieldNames.length == fieldTypes.length,
+			"Number of provided field names and types does not match.");
+		return new CassandraTableSink(this.hostAddrs, this.cql, fieldNames, fieldTypes, this.properties);
 	}
 
 	@Override

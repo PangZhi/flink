@@ -465,9 +465,9 @@ public class CassandraConnectorITCase extends WriteAheadSinkTestBase<Tuple3<Stri
 		env.setParallelism(1);
 
 		DataStreamSource<org.apache.flink.types.Row> source = env.fromCollection(rowCollection);
-		CassandraTableink cassandraTableink = new CassandraTableink(ImmutableList.of(new InetSocketAddress(HOST, PORT)), INSERT_DATA_QUERY, FIELD_NAME, FIELD_TYPES, new Properties());
+		CassandraTableSink cassandraTableSink = new CassandraTableSink(ImmutableList.of(new InetSocketAddress(HOST, PORT)), INSERT_DATA_QUERY, FIELD_NAME, FIELD_TYPES, new Properties());
 
-		cassandraTableink.emitDataStream(source);
+		cassandraTableSink.emitDataStream(source);
 
 		env.execute();
 		ResultSet rs = session.execute(SELECT_DATA_QUERY);
